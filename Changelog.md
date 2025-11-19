@@ -1,4 +1,44 @@
-### Changelog - ForgePDF   (Version 1.00)
+### Changelog - ForgePDF
+
+## Version 1.01 (2025-11-19)
+
+### 🔧 Critical Fixes
+- **Fixed PDF Trailer Issue**: Implemented missing `_puttrailer()` method that was causing PDF validation failures
+- **Fixed PDF Structure**: Restored proper FPDF closing sequence following the correct order:
+  - `_putpages()`
+  - `_putresources()`
+  - `_putinfo()`
+  - `_putcatalog()`
+  - `_putxref()`
+  - `_puttrailer()`
+  - `_enddoc()`
+- **Fixed Content References**: Corrected `/Contents` object references in `_putpage()` method
+- **Fixed Page Object Ordering**: Restored proper page content writing sequence
+
+### 🚀 Improvements
+- **Enhanced Output Methods**: Improved `Outpute()` method to handle both file mode and compatibility mode
+- **Better Error Handling**: Added proper file handle checks to prevent runtime errors
+- **Cross-Reference Table**: Implemented complete xref table with proper Size, Root, and Info references
+- **PDF Validation**: All generated PDFs now pass standard PDF validators and work correctly with PDF reading APIs
+
+### 🔍 What was fixed
+- PDF files showing blank content in viewers
+- "Unable to load page tree" errors in PDF APIs
+- "Truncated file" warnings in PDF validators
+- Incorrect page counting in PDF readers
+- Missing trailer section causing PDF corruption
+- Invalid cross-reference table entries
+
+### ✅ Tested
+- Simple PDF generation
+- Complex text with special characters and bullets  
+- Table generation with ForgePDFTab
+- Both file mode (with `Open()`) and compatibility mode
+- PDF validation with external tools
+
+---
+
+## Version 1.00 (2024-10-29)
 
 #### New Features
 - **ForgePDF Class**: A customized FPDF extension for handling PDF generation with enhanced file management and improved image handling.

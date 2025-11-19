@@ -5,14 +5,14 @@ use ForgePDF\ForgePDFTab;
 /*******************************************************************************
  * ForgePDF                                                                     *
  *                                                                              *
- * Version: 1.00                                                                *
- * Date:    2024-10-29                                                          *
+ * Version: 1.01                                                                *
+ * Date:    2025-11-19                                                          *
  * Author:  Luan Costa                                                          *
  *******************************************************************************/
 
 class ForgePDF extends ForgePDFTab
 {
-    const VERSION = "1.00";
+    const VERSION = "1.01";
 
     protected $f;
 
@@ -95,27 +95,41 @@ class ForgePDF extends ForgePDFTab
      */
     public function Outpute($dest = "", $name = "", $isUTF8 = false)
     {
-        if ($this->state < 3) {
-            $this->Close();
+        // Se tem arquivo aberto (modo ForgePDF), fechar antes
+        if (isset($this->f) && $this->f) {
+            if ($this->state < 3) {
+                $this->Close();
+            }
+            // Não chamar parent::Output pois já foi escrito no arquivo
+            return;
         }
+        
+        // Modo compatível (sem Open) - usar o Output padrão do FPDF
+        parent::Output($dest, $name, $isUTF8);
     }
 
     protected function _endpage()
     {
         parent::_endpage();
-        // Write page to file
-        $this->_putstreamobject($this->pages[$this->page]);
-        unset($this->pages[$this->page]);
     }
 
     protected function _getoffset()
     {
+        // Se não tem arquivo aberto, usar o offset padrão do FPDF
+        if (!isset($this->f) || !$this->f) {
+            return strlen($this->buffer);
+        }
         return ftell($this->f);
     }
 
     protected function _put($s)
     {
-        fwrite($this->f, $s . "\n", strlen($s) + 1);
+        // Se não tem arquivo aberto, usar o buffer padrão do FPDF
+        if (!isset($this->f) || !$this->f) {
+            $this->buffer .= $s . "\n";
+        } else {
+            fwrite($this->f, $s . "\n", strlen($s) + 1);
+        }
     }
 
     protected function _putimages()
@@ -140,36 +154,41 @@ class ForgePDF extends ForgePDFTab
     protected function _putpage($n)
     {
         $this->_newobj();
-        $this->_put("<</Type /Page");
-        $this->_put("/Parent 1 0 R");
-        if (isset($this->PageInfo[$n]["size"])) {
+        $this->_put('<</Type /Page');
+        $this->_put('/Parent 1 0 R');
+        if (isset($this->PageInfo[$n]['size'])) {
             $this->_put(
                 sprintf(
-                    "/MediaBox [0 0 %.2F %.2F]",
-                    $this->PageInfo[$n]["size"][0],
-                    $this->PageInfo[$n]["size"][1]
+                    '/MediaBox [0 0 %.2F %.2F]',
+                    $this->PageInfo[$n]['size'][0],
+                    $this->PageInfo[$n]['size'][1]
                 )
             );
         }
-        if (isset($this->PageInfo[$n]["rotation"])) {
-            $this->_put("/Rotate " . $this->PageInfo[$n]["rotation"]);
+        if (isset($this->PageInfo[$n]['rotation'])) {
+            $this->_put('/Rotate ' . $this->PageInfo[$n]['rotation']);
         }
-        $this->_put("/Resources 2 0 R");
+        $this->_put('/Resources 2 0 R');
         if (!empty($this->PageLinks[$n])) {
-            $s = "/Annots [";
+            $s = '/Annots [';
             foreach ($this->PageLinks[$n] as $pl) {
-                $s .= $pl[5] . " 0 R ";
+                $s .= $pl[5] . ' 0 R ';
             }
-            $s .= "]";
+            $s .= ']';
             $this->_put($s);
         }
         if ($this->WithAlpha) {
             $this->_put(
-                "/Group <</Type /Group /S /Transparency /CS /DeviceRGB>>"
+                '/Group <</Type /Group /S /Transparency /CS /DeviceRGB>>'
             );
         }
-        $this->_put("/Contents " . (2 + $n) . " 0 R>>");
-        $this->_put("endobj");
+        $this->_put('/Contents '.($this->n+1).' 0 R>>');
+        $this->_put('endobj');
+        // Page content
+        if(!empty($this->AliasNbPages))
+            $this->pages[$n] = str_replace($this->AliasNbPages,$this->page,$this->pages[$n]);
+        $this->_putstreamobject($this->pages[$n]);
+        // Link annotations
         $this->_putlinks($n);
     }
 
@@ -178,7 +197,8 @@ class ForgePDF extends ForgePDFTab
         $nb = $this->page;
         $n = $this->n;
         for ($i = 1; $i <= $nb; $i++) {
-            $this->PageInfo[$i]["n"] = ++$n;
+            $this->PageInfo[$i]['n'] = ++$n;
+            $n++;
             foreach ($this->PageLinks[$i] as &$pl) {
                 $pl[5] = ++$n;
             }
@@ -189,15 +209,15 @@ class ForgePDF extends ForgePDFTab
         }
         // Pages root
         $this->_newobj(1);
-        $this->_put("<</Type /Pages");
-        $kids = "/Kids [";
+        $this->_put('<</Type /Pages');
+        $kids = '/Kids [';
         for ($i = 1; $i <= $nb; $i++) {
-            $kids .= $this->PageInfo[$i]["n"] . " 0 R ";
+            $kids .= $this->PageInfo[$i]['n'] . ' 0 R ';
         }
-        $kids .= "]";
+        $kids .= ']';
         $this->_put($kids);
-        $this->_put("/Count " . $nb);
-        if ($this->DefOrientation == "P") {
+        $this->_put('/Count ' . $nb);
+        if ($this->DefOrientation == 'P') {
             $w = $this->DefPageSize[0];
             $h = $this->DefPageSize[1];
         } else {
@@ -205,10 +225,10 @@ class ForgePDF extends ForgePDFTab
             $h = $this->DefPageSize[0];
         }
         $this->_put(
-            sprintf("/MediaBox [0 0 %.2F %.2F]", $w * $this->k, $h * $this->k)
+            sprintf('/MediaBox [0 0 %.2F %.2F]', $w * $this->k, $h * $this->k)
         );
-        $this->_put(">>");
-        $this->_put("endobj");
+        $this->_put('>>');
+        $this->_put('endobj');
     }
 
     protected function _putheader()
@@ -218,10 +238,52 @@ class ForgePDF extends ForgePDFTab
         }
     }
 
+    protected function _puttrailer()
+    {
+        $this->_put('/Size '.($this->n+1));
+        $this->_put('/Root '.$this->n.' 0 R');
+        $this->_put('/Info '.($this->n-1).' 0 R');
+    }
+
     protected function _enddoc()
     {
-        parent::_enddoc();
-        fclose($this->f);
+        $this->CreationDate = time();
+        $this->_putheader();
+        $this->_putpages();
+        $this->_putresources();
+        // Info
+        $this->_newobj();
+        $this->_put('<<');
+        $this->_putinfo();
+        $this->_put('>>');
+        $this->_put('endobj');
+        // Catalog
+        $this->_newobj();
+        $this->_put('<<');
+        $this->_putcatalog();
+        $this->_put('>>');
+        $this->_put('endobj');
+        // Cross-ref
+        $offset = $this->_getoffset();
+        $this->_put('xref');
+        $this->_put('0 '.($this->n+1));
+        $this->_put('0000000000 65535 f ');
+        for($i=1;$i<=$this->n;$i++)
+            $this->_put(sprintf('%010d 00000 n ',$this->offsets[$i]));
+        // Trailer
+        $this->_put('trailer');
+        $this->_put('<<');
+        $this->_puttrailer();
+        $this->_put('>>');
+        $this->_put('startxref');
+        $this->_put($offset);
+        $this->_put('%%EOF');
+        $this->state = 3;
+        
+        // Fechar arquivo apenas se foi aberto com Open()
+        if (isset($this->f) && $this->f) {
+            fclose($this->f);
+        }
     }
 
     public function convertText($text)
